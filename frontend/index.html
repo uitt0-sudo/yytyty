@@ -1,60 +1,388 @@
-<?php
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Casino UI (Static Demo)</title>
 
-/**
- * Laravel - A PHP Framework For Web Artisans
- *
- * @package  Laravel
- * @author   Taylor Otwell <taylor@laravel.com>
- */
+  <link rel="icon" href="./favicon.ico" />
+  <link rel="stylesheet" href="./css/dark-purple.css" />
+  <style>
+    /* small helpers (keeps the original theme look) */
+    .demo-badge { font-size: 12px; opacity: .8; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); }
+    .card img { width: 100%; height: 140px; object-fit: cover; display:block; }
+    .card .body { padding: 14px; }
+    .pill { display:inline-block; padding:6px 10px; border-radius:999px; background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); }
+    .linkish { cursor:pointer; }
+    .muted { opacity:.8; }
+    .route-title { margin: 0 0 8px; }
+    .route-sub { margin:0 0 18px; }
+    .btn-demo { border-radius: 12px; padding: 10px 14px; display:inline-flex; align-items:center; gap:8px; }
+    .btn-demo:active { transform: translateY(1px); }
+    .fake-form input { width:100%; max-width: 420px; }
+  </style>
+</head>
 
-define('LARAVEL_START', microtime(true));
+<body class="layout-wide theme-dark-purple">
+  <div class="container-fluid px-0">
+    <nav class="navbar navbar-expand-md navbar-dark">
+      <a class="navbar-brand text-body" href="/" data-nav>
+        <img src="./images/logo.png" class="d-inline-block align-top" alt="Casino" style="height:28px" />
+        CASIN <span class="demo-badge pill ml-2">UI-only demo</span>
+      </a>
 
-/*
-|--------------------------------------------------------------------------
-| Register The Auto Loader
-|--------------------------------------------------------------------------
-|
-| Composer provides a convenient, automatically generated class loader for
-| our application. We just need to utilize it! We'll simply require it
-| into the script here so that we don't have to worry about manual
-| loading any of our classes later on. It feels great to relax.
-|
-*/
+      <button class="navbar-toggler" type="button" aria-label="Toggle navigation" onclick="toggleNav()">
+        <span class="navbar-toggler-icon"></span>
+      </button>
 
-require __DIR__.'/../vendor/autoload.php';
+      <div class="collapse navbar-collapse justify-content-end" id="navbar">
+        <div class="navbar-nav flex-grow-1">
+          <a class="nav-item nav-link" href="/" data-nav>Home</a>
+          <a class="nav-item nav-link" href="/games" data-nav>Games</a>
+          <a class="nav-item nav-link" href="/leaderboard" data-nav>Leaderboard</a>
+          <a class="nav-item nav-link" href="/bonuses" data-nav>Bonuses</a>
+          <a class="nav-item nav-link" href="/chat" data-nav>Chat</a>
+        </div>
+        <div class="navbar-nav">
+          <a class="nav-item nav-link" href="/login" data-nav>Login</a>
+          <a class="nav-item nav-link" href="/register" data-nav>Register</a>
+        </div>
+      </div>
+    </nav>
+  </div>
 
-/*
-|--------------------------------------------------------------------------
-| Turn On The Lights
-|--------------------------------------------------------------------------
-|
-| We need to illuminate PHP development, so let us turn on the lights.
-| This bootstraps the framework and gets it ready for use, then it
-| will load up this application so that we can run it and send
-| the responses back to the browser and delight our users.
-|
-*/
+  <main class="container mt-4 mb-5">
+    <div id="app"></div>
+  </main>
 
-$app = require_once __DIR__.'/../bootstrap/app.php';
+  <footer class="container mb-5 muted">
+    <div class="d-flex flex-wrap justify-content-between align-items-center">
+      <div>© <span id="year"></span> CASIN — Static frontend demo</div>
+      <div class="d-flex gap-3">
+        <a href="/terms" data-nav>Terms</a>
+        <a href="/privacy" data-nav>Privacy</a>
+        <a href="/provably-fair" data-nav>Provably Fair</a>
+      </div>
+    </div>
+  </footer>
 
-/*
-|--------------------------------------------------------------------------
-| Run The Application
-|--------------------------------------------------------------------------
-|
-| Once we have the application, we can handle the incoming request
-| through the kernel, and send the associated response back to
-| the client's browser allowing them to enjoy the creative
-| and wonderful application we have prepared for them.
-|
-*/
+  <script>
+    // Simple SPA-ish router so everything is clickable on Vercel static
+    const routes = {
+      "/": homeView,
+      "/games": gamesView,
+      "/games/slots": slotsView,
+      "/leaderboard": leaderboardView,
+      "/bonuses": bonusesView,
+      "/chat": chatView,
+      "/login": loginView,
+      "/register": registerView,
+      "/terms": termsView,
+      "/privacy": privacyView,
+      "/provably-fair": provablyFairView
+    };
 
-$kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+    function navigate(path) {
+      history.pushState({}, "", path);
+      render();
+      closeNavIfMobile();
+      window.scrollTo(0,0);
+    }
 
-$response = $kernel->handle(
-    $request = Illuminate\Http\Request::capture()
-);
+    function render() {
+      const app = document.getElementById("app");
+      const path = location.pathname.replace(/\/$/, "") || "/";
+      const view = routes[path] || notFoundView;
+      app.innerHTML = view(path);
+      highlightActive(path);
+    }
 
-$response->send();
+    function highlightActive(path){
+      document.querySelectorAll("[data-nav]").forEach(a=>{
+        const href = a.getAttribute("href");
+        const active = href === path || (href !== "/" && path.startsWith(href));
+        a.classList.toggle("active", !!active);
+      });
+    }
 
-$kernel->terminate($request, $response);
+    function bindNav() {
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest("a[data-nav]");
+        if (!a) return;
+        const href = a.getAttribute("href");
+        if (!href || href.startsWith("http")) return;
+        e.preventDefault();
+        navigate(href);
+      });
+      window.addEventListener("popstate", render);
+    }
+
+    function toggleNav(){
+      const nav = document.getElementById("navbar");
+      nav.classList.toggle("show");
+    }
+    function closeNavIfMobile(){
+      const nav = document.getElementById("navbar");
+      nav.classList.remove("show");
+    }
+
+    // Views
+    function homeView(){
+      return `
+        <div class="jumbotron py-5">
+          <h1 class="display-4">Casino UI Demo</h1>
+          <p class="lead muted">This is the original project's theme/assets, but running as a static site on Vercel. Everything is clickable; backend actions are stubbed.</p>
+          <hr class="my-4" />
+          <div class="d-flex flex-wrap" style="gap:10px">
+            <a class="btn btn-primary btn-demo" href="/games" data-nav>Browse Games</a>
+            <a class="btn btn-outline-light btn-demo" href="/login" data-nav>Login (UI)</a>
+            <a class="btn btn-outline-light btn-demo" href="/register" data-nav>Create Account (UI)</a>
+          </div>
+
+          <div class="mt-4 card-grid">
+            ${card("Slots", "./images/games/slots/background.jpg", "Spin demo screen (UI only).", "/games/slots")}
+            ${card("Leaderboard", "./images/help/bonuses.jpg", "Top wins / losses (mock).", "/leaderboard")}
+            ${card("Chat", "./images/help/facebook-oauth.jpg", "Live chat layout (mock).", "/chat")}
+          </div>
+        </div>
+      `;
+    }
+
+    function gamesView(){
+      return `
+        <h2 class="route-title">Games</h2>
+        <p class="route-sub muted">Pick a game — pages are UI-only.</p>
+        <div class="card-grid">
+          ${card("Slots", "./images/games/slots/background.jpg", "Classic slots layout.", "/games/slots")}
+          ${card("Provably Fair", "./images/help/provably-fair.jpg", "How fairness works (static).", "/provably-fair")}
+          ${card("Bonuses", "./images/help/bonuses.jpg", "Promotions list (mock).", "/bonuses")}
+        </div>
+      `;
+    }
+
+    function slotsView(){
+      return `
+        <div class="d-flex flex-wrap justify-content-between align-items-center">
+          <div>
+            <h2 class="route-title">Slots</h2>
+            <p class="route-sub muted">UI-only. The reel spin is a visual mock.</p>
+          </div>
+          <a class="btn btn-outline-light btn-demo" href="/games" data-nav>Back</a>
+        </div>
+
+        <div class="card" style="max-width: 920px; margin: 0 auto;">
+          <img src="./images/games/slots/background.jpg" alt="Slots background" />
+          <div class="body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center" style="gap:10px">
+              <div class="pill">Balance: <strong>1.234 BTC</strong></div>
+              <div class="pill">Bet: <strong>0.001 BTC</strong></div>
+              <div class="pill">RTP: <strong>96%</strong></div>
+            </div>
+
+            <div class="mt-4" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+              ${slotSymbol("./images/games/slots/symbols/cherry.png")}
+              ${slotSymbol("./images/games/slots/symbols/seven.png")}
+              ${slotSymbol("./images/games/slots/symbols/bar.png")}
+            </div>
+
+            <div class="mt-4 d-flex flex-wrap" style="gap:10px">
+              <button class="btn btn-primary btn-demo" onclick="fakeSpin()">Spin</button>
+              <button class="btn btn-outline-light btn-demo" onclick="toast('Demo only — no backend connected.')">Auto</button>
+              <button class="btn btn-outline-light btn-demo" onclick="toast('Demo only — no backend connected.')">Max Bet</button>
+            </div>
+
+            <div class="mt-3 muted" id="spinStatus">Click <strong>Spin</strong> to animate (mock).</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function leaderboardView(){
+      return `
+        <h2 class="route-title">Leaderboard</h2>
+        <p class="route-sub muted">Static mock data for UI.</p>
+        <div class="card">
+          <div class="body">
+            <table class="table table-dark table-striped mb-0">
+              <thead><tr><th>#</th><th>User</th><th>Game</th><th>Win</th></tr></thead>
+              <tbody>
+                ${[["1","whale.sol","Slots","3.21 BTC"],["2","monkey","Roulette","1.07 BTC"],["3","anon","Slots","0.62 BTC"],["4","degen","Dice","0.41 BTC"],["5","luckbox","Slots","0.29 BTC"]]
+                  .map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function bonusesView(){
+      return `
+        <h2 class="route-title">Bonuses</h2>
+        <p class="route-sub muted">Clicking “Claim” just shows a toast.</p>
+        <div class="card-grid">
+          ${bonusCard("Welcome Bonus", "Deposit match up to 100%", "Claim")}
+          ${bonusCard("Daily Spin", "One free spin per day", "Spin")}
+          ${bonusCard("VIP Ladder", "Unlock higher rewards", "View")}
+        </div>
+      `;
+    }
+
+    function chatView(){
+      return `
+        <h2 class="route-title">Chat</h2>
+        <p class="route-sub muted">UI mock — messages are not sent.</p>
+        <div class="card">
+          <div class="body">
+            <div style="height:240px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px;">
+              ${["yo","anyone on?","big hit on slots","gg"].map((m,i)=>`<div class="mb-2"><span class="pill mr-2">user${i+1}</span> ${m}</div>`).join("")}
+            </div>
+            <div class="mt-3 d-flex" style="gap:10px">
+              <input class="form-control" placeholder="Type message…" />
+              <button class="btn btn-primary" onclick="toast('Demo only — chat is not connected.')">Send</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function loginView(){
+      return authView("Login", "Sign in to your account", "Login");
+    }
+    function registerView(){
+      return authView("Register", "Create a new account", "Create account");
+    }
+
+    function authView(title, subtitle, cta){
+      return `
+        <div class="card" style="max-width:560px; margin: 0 auto;">
+          <div class="body">
+            <h2 class="route-title">${title}</h2>
+            <p class="route-sub muted">${subtitle} (UI only)</p>
+            <div class="fake-form" style="display:grid; gap:12px;">
+              <input class="form-control" placeholder="Email" />
+              <input class="form-control" placeholder="Password" type="password" />
+              ${title==="Register" ? '<input class="form-control" placeholder="Confirm password" type="password" />' : ''}
+              <button class="btn btn-primary" onclick="toast('Demo only — auth is not connected.')">${cta}</button>
+              <div class="muted">${title==="Login" ? 'No account? <a href="/register" data-nav>Create one</a>' : 'Already have an account? <a href="/login" data-nav>Login</a>'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function termsView(){ return staticDoc("Terms of Use", "This is a demo frontend. Replace with your terms text."); }
+    function privacyView(){ return staticDoc("Privacy Policy", "This is a demo frontend. Replace with your privacy policy text."); }
+    function provablyFairView(){ return staticDoc("Provably Fair", "UI-only demo. In the real app this explains seeds, hashes, and verification."); }
+
+    function staticDoc(title, body){
+      return `
+        <div class="card">
+          <div class="body">
+            <h2 class="route-title">${title}</h2>
+            <p class="muted">${body}</p>
+            <p class="muted">Want the full working version? You must deploy the PHP/Laravel backend (Render/Docker/etc).</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function notFoundView(path){
+      return `
+        <h2 class="route-title">Page not found</h2>
+        <p class="route-sub muted">No static route for <code>${path}</code> — but navigation still works.</p>
+        <a class="btn btn-primary btn-demo" href="/" data-nav>Go Home</a>
+      `;
+    }
+
+    function card(title, img, desc, href){
+      return `
+        <div class="card">
+          <img src="${img}" alt="${title}" />
+          <div class="body">
+            <div class="d-flex justify-content-between align-items-center">
+              <h5 class="mb-1">${title}</h5>
+              <span class="pill">UI</span>
+            </div>
+            <div class="muted mb-3">${desc}</div>
+            <a class="btn btn-outline-light btn-demo" href="${href}" data-nav>Open</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function bonusCard(title, desc, cta){
+      return `
+        <div class="card">
+          <div class="body">
+            <h5 class="mb-1">${title}</h5>
+            <div class="muted mb-3">${desc}</div>
+            <button class="btn btn-primary btn-demo" onclick="toast('Demo only — action not connected.')">${cta}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function slotSymbol(src){
+      return `
+        <div class="card" style="padding: 14px; display:flex; align-items:center; justify-content:center; min-height:110px;">
+          <img src="${src}" alt="symbol" style="max-height:76px; width:auto;" />
+        </div>
+      `;
+    }
+
+    function toast(msg){
+      let t=document.getElementById("toast");
+      if(!t){
+        t=document.createElement("div");
+        t.id="toast";
+        t.style.position="fixed";
+        t.style.left="50%";
+        t.style.bottom="24px";
+        t.style.transform="translateX(-50%)";
+        t.style.padding="10px 14px";
+        t.style.borderRadius="12px";
+        t.style.background="rgba(0,0,0,.7)";
+        t.style.border="1px solid rgba(255,255,255,.15)";
+        t.style.backdropFilter="blur(10px)";
+        t.style.zIndex="9999";
+        document.body.appendChild(t);
+      }
+      t.textContent=msg;
+      t.style.display="block";
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer=setTimeout(()=>{ t.style.display="none"; }, 1800);
+    }
+
+    function fakeSpin(){
+      const symbols = [
+        "./images/games/slots/symbols/cherry.png",
+        "./images/games/slots/symbols/seven.png",
+        "./images/games/slots/symbols/bar.png",
+        "./images/games/slots/symbols/bell.png",
+        "./images/games/slots/symbols/lemon.png",
+        "./images/games/slots/symbols/orange.png",
+        "./images/games/slots/symbols/plum.png",
+        "./images/games/slots/symbols/water-melon.png",
+        "./images/games/slots/symbols/apple.png"
+      ];
+      const picks = Array.from({length:3}, ()=> symbols[Math.floor(Math.random()*symbols.length)]);
+      const grid = document.querySelectorAll("main .card img[alt='symbol']");
+      if(grid.length>=3){
+        grid[0].src=picks[0];
+        grid[1].src=picks[1];
+        grid[2].src=picks[2];
+      }
+      const status = document.getElementById("spinStatus");
+      if(status) status.textContent = "Result: " + picks.map(p=>p.split("/").pop().replace(".png","")).join(" • ") + " (mock)";
+      toast("Spin (mock) ✅");
+    }
+
+    // Boot
+    document.getElementById("year").textContent = new Date().getFullYear();
+    bindNav();
+    render();
+  </script>
+</body>
+</html>
